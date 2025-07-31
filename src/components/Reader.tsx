@@ -21,7 +21,7 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
   const [detectedTerms, setDetectedTerms] = useState<string[]>([])
   const [isDetectingTerms, setIsDetectingTerms] = useState(false)
   const [termExplanations, setTermExplanations] = useState<Record<string, any>>({})
-  const [manualMode, setManualMode] = useState(false)
+  const [manualMode, setManualMode] = useState(true)
   const [selectedText, setSelectedText] = useState('')
 
   // Detect terms using Gemini if available
@@ -80,8 +80,8 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
         const range = selection.getRangeAt(0)
         const rect = range.getBoundingClientRect()
         setTooltipPosition({
-          x: rect.left + rect.width / 2,
-          y: rect.top - 10,
+          x: rect.left + rect.width / 2 + window.scrollX,
+          y: rect.top - 10 + window.scrollY,
           visible: true
         })
         setActiveTerm(term)
@@ -143,8 +143,8 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
   const handleTermHover = async (event: React.MouseEvent, term: string) => {
     const rect = event.currentTarget.getBoundingClientRect()
     setTooltipPosition({
-      x: rect.left + rect.width / 2,
-      y: rect.top - 10,
+      x: rect.left + rect.width / 2 + window.scrollX,
+      y: rect.top - 10 + window.scrollY,
       visible: true
     })
     setActiveTerm(term)
