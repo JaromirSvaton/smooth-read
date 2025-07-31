@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .term-highlight {
+    @apply bg-yellow-100 border-b-2 border-yellow-300 cursor-help transition-all duration-200 hover:bg-yellow-200;
+  }
+  
+  .tooltip {
+    @apply absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 max-w-xs text-sm;
+    animation: slideUp 0.2s ease-out;
+  }
+  
+  .tooltip-arrow {
+    @apply absolute w-2 h-2 bg-white border-l border-t border-gray-200 transform rotate-45;
+  }
+  
+  .formatted-content {
+    @apply whitespace-pre-wrap;
+  }
+  
+  .formatted-content h2 {
+    @apply text-xl font-bold text-gray-900 mt-6 mb-3;
+  }
+  
+  .formatted-content p {
+    @apply mb-3 leading-relaxed;
+  }
+} 
