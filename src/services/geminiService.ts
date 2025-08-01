@@ -19,7 +19,7 @@ interface TermExplanation {
 
 export class GeminiService {
   private apiKey: string
-  private baseUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent'
+  private baseUrl = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-8b:generateContent'
 
   constructor(apiKey: string) {
     this.apiKey = apiKey
