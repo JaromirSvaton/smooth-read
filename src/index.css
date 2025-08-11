@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global themes */
+.sepia {
+  --bg: #f6f1e1;
+  --fg: #3a2f1d;
+}
+
+.sepia body {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+.dark body {
+  background-color: #0b1220;
+  color: #e2e8f0;
+}
+
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;

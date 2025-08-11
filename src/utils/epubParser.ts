@@ -1,9 +1,29 @@
 // EPUB parsing utility for extracting text content from EPUB files using epubjs
 import ePub from 'epubjs'
 
+interface EbookChapter {
+  title: string
+  content: string
+  id: string
+}
+
+interface EbookData {
+  id?: string
+  title: string
+  author?: string
+  chapters: EbookChapter[]
+  arrayBuffer: ArrayBuffer
+}
+
 export const parseEPUB = async (file: File): Promise<string> => {
+  // Legacy function for backward compatibility
+  const ebookData = await parseEPUBToChapters(file)
+  return ebookData.chapters.map(chapter => `## ${chapter.title}\n\n${chapter.content}`).join('\n\n')
+}
+
+export const parseEPUBToChapters = async (file: File): Promise<EbookData> => {
   try {
-    console.log('Starting EPUB parsing for:', file.name)
+    console.log('📚 Starting EPUB chapter parsing for:', file.name)
     
     // Convert File to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()
@@ -14,26 +34,87 @@ export const parseEPUB = async (file: File): Promise<string> => {
     // Load the book
     await book.ready
     
-    console.log('EPUB metadata loaded:', {
-      title: book.packaging?.metadata?.title,
-      creator: book.packaging?.metadata?.creator,
-      description: book.packaging?.metadata?.description
+    const metadata = book.packaging?.metadata
+    console.log('📖 EPUB metadata loaded:', {
+      title: metadata?.title,
+      creator: metadata?.creator,
+      description: metadata?.description
     })
     
-    // Extract text content from all sections
-    const content = await extractAllSections(book)
+    // Extract chapters separately
+    const chapters = await extractChapters(book)
     
-    if (!content || content.length < 50) {
-      throw new Error('The EPUB file appears to have very little readable content')
+    if (!chapters || chapters.length === 0) {
+      throw new Error('The EPUB file appears to have no readable chapters')
     }
     
-    return content
+    return {
+      title: metadata?.title || 'Unknown Title',
+      author: metadata?.creator,
+      chapters: chapters,
+      arrayBuffer
+    }
   } catch (error) {
     console.error('Error parsing EPUB:', error)
     if (error instanceof Error) {
       throw new Error(`Failed to parse EPUB file: ${error.message}`)
     }
     throw new Error('Failed to parse EPUB file. Please make sure it\'s a valid EPUB document.')
+  }
+}
+
+const extractChapters = async (book: any): Promise<EbookChapter[]> => {
+  try {
+    const spine = book.spine.spineItems
+    console.log(`📄 Processing ${spine.length} sections as chapters`)
+    
+    const chapters: EbookChapter[] = []
+    
+    // Process each section as a separate chapter
+    for (let i = 0; i < spine.length; i++) {
+      const section = spine[i]
+      try {
+        console.log(`📄 Processing chapter ${i + 1}/${spine.length}: ${section.href}`)
+        
+        // Load the section
+        const doc = await section.load(book.load.bind(book))
+        const sectionContent = extractTextFromDocument(doc)
+        
+        if (sectionContent && sectionContent.trim()) {
+          // Try to get chapter title from the first heading or use a default
+          const lines = sectionContent.split('\n')
+          let title = `Chapter ${i + 1}`
+          let content = sectionContent
+          
+          // Look for title in first few lines
+          for (let j = 0; j < Math.min(3, lines.length); j++) {
+            const line = lines[j].trim()
+            if (line && !line.startsWith('#') && line.length < 100) {
+              title = line
+              content = lines.slice(j + 1).join('\n').trim()
+              break
+            } else if (line.startsWith('# ')) {
+              title = line.substring(2).trim()
+              content = lines.slice(j + 1).join('\n').trim()
+              break
+            }
+          }
+          
+          chapters.push({
+            title: title,
+            content: content,
+            id: section.href
+          })
+        }
+      } catch (sectionError) {
+        console.warn(`⚠️ Failed to process section ${section.href}:`, sectionError)
+      }
+    }
+    
+    return chapters
+  } catch (error) {
+    console.error('Error extracting chapters:', error)
+    throw new Error('Failed to extract chapters from EPUB')
   }
 }
 
@@ -94,6 +175,12 @@ const extractAllSections = async (book: any): Promise<string> => {
 
 const extractTextFromDocument = (doc: Document): string => {
   try {
+    // Check if doc is a proper Document with required methods
+    if (!doc || typeof doc.createTreeWalker !== 'function') {
+      console.warn('Invalid document object, falling back to text extraction')
+      return doc?.textContent || doc?.body?.textContent || ''
+    }
+    
     // Remove script and style elements
     const scripts = doc.querySelectorAll('script, style')
     scripts.forEach(el => el.remove())
@@ -184,3 +271,6 @@ export const isEPUBFile = (file: File): boolean => {
   return file.type === 'application/epub+zip' || 
          file.name.toLowerCase().endsWith('.epub')
 }
+
+// Export types
+export type { EbookChapter, EbookData }

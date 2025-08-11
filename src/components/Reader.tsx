@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { ArrowLeft, BookOpen, Info, MousePointer } from 'lucide-react'
 import { TooltipPosition } from '../types'
-import TermTooltip from './TermTooltip'
+import StableTooltip from './StableTooltip'
 import { GeminiService } from '../services/geminiService'
 
 interface ReaderProps {
@@ -11,6 +11,17 @@ interface ReaderProps {
 }
 
 const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }) => {
+  const renderCount = useRef(0)
+  renderCount.current += 1
+  console.log(`🔄 Reader render #${renderCount.current}, content length:`, content.length)
+  
+  // Track what's causing re-renders
+  const prevProps = useRef({ content, onBackToInput, geminiService })
+  if (prevProps.current.content !== content) console.log('❌ Re-render caused by: content change')
+  if (prevProps.current.onBackToInput !== onBackToInput) console.log('❌ Re-render caused by: onBackToInput change')  
+  if (prevProps.current.geminiService !== geminiService) console.log('❌ Re-render caused by: geminiService change')
+  prevProps.current = { content, onBackToInput, geminiService }
+  
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition>({
     x: 0,
     y: 0,
@@ -19,15 +30,34 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
   const [activeTerm, setActiveTerm] = useState<string | null>(null)
   const [termExplanations, setTermExplanations] = useState<Record<string, any>>({})
   const [selectedText, setSelectedText] = useState('')
+  
+  // Use refs to prevent re-renders from affecting state
+  const activeTermRef = useRef<string | null>(null)
+  const tooltipPositionRef = useRef<TooltipPosition>({ x: 0, y: 0, visible: false })
 
   const MAX_SELECTION_WORDS = 5 // Word limit for manual selection
 
+  // Debug when state changes
+  useEffect(() => {
+    console.log('TooltipPosition changed:', tooltipPosition)
+  }, [tooltipPosition])
+
+  useEffect(() => {
+    console.log('ActiveTerm changed:', activeTerm)
+  }, [activeTerm])
+
   // Handle text selection for manual mode
-  const handleTextSelection = () => {
+  const handleTextSelection = useCallback(() => {
+    console.log('=== Text selection triggered ===')
     const selection = window.getSelection()
+    console.log('Selection object:', selection)
+    console.log('Selection text:', selection?.toString())
+    
     if (selection && selection.toString().trim()) {
       const selectedText = selection.toString().trim()
+      console.log('Selected text:', selectedText)
       const wordCount = selectedText.split(/\s+/).filter(word => word.length > 0).length
+      console.log('Word count:', wordCount)
       
       if (wordCount > MAX_SELECTION_WORDS) {
         // Show error tooltip for too many words
@@ -59,14 +89,23 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
       
       setSelectedText(selectedText)
       
+      // Capture selection position before async operations
+      const range = selection.getRangeAt(0)
+      const rect = range.getBoundingClientRect()
+      const tooltipPos = {
+        x: rect.left + rect.width / 2 + window.scrollX,
+        y: rect.top - 10 + window.scrollY,
+        visible: true
+      }
+      
       // Get explanation for selected text
       if (geminiService && selectedText.length > 0) {
-        handleManualTermExplanation(selectedText)
+        handleManualTermExplanation(selectedText, tooltipPos)
       }
     }
-  }
+  }, [geminiService, content])
 
-  const handleManualTermExplanation = async (term: string) => {
+  const handleManualTermExplanation = async (term: string, tooltipPos: TooltipPosition) => {
     if (!geminiService) return
 
     try {
@@ -78,18 +117,26 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
         [term]: explanation
       }))
       
-      // Show tooltip for the selected term
-      const selection = window.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        const rect = range.getBoundingClientRect()
-        setTooltipPosition({
-          x: rect.left + rect.width / 2 + window.scrollX,
-          y: rect.top - 10 + window.scrollY,
-          visible: true
-        })
+      // Show tooltip at the captured position
+      console.log('Setting tooltip position:', tooltipPos)
+      console.log('Setting active term:', term)
+      
+      // Update refs immediately
+      activeTermRef.current = term
+      tooltipPositionRef.current = tooltipPos
+      
+      // Update state in a way that won't trigger re-renders during async operations  
+      setActiveTerm(term)
+      setTooltipPosition(tooltipPos)
+      
+      // Force re-render with a small delay to ensure state sticks
+      setTimeout(() => {
         setActiveTerm(term)
-      }
+        setTooltipPosition(tooltipPos)
+        console.log('Force re-set tooltip state:', { term, tooltipPos })
+      }, 50)
+      
+      console.log('Tooltip and term set successfully')
     } catch (error) {
       console.error('Error getting term explanation:', error)
     }
@@ -102,7 +149,8 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
     setActiveTerm(null)
   }
 
-  const renderContent = () => {
+  const renderContent = useMemo(() => {
+    console.log('Rendering content (memoized)')
     return (
       <div 
         className="text-gray-700 leading-relaxed cursor-text"
@@ -111,14 +159,48 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
       >
         {content.split('\n').map((line, index) => {
           if (line.trim() === '') return <br key={index} />
+          
+          // Handle main title (# Title)
+          if (line.startsWith('# ')) {
+            return <h1 key={index} className="text-2xl font-bold text-gray-900 mt-8 mb-4">{line.substring(2)}</h1>
+          }
+          
+          // Handle chapter headings (## Chapter)
           if (line.startsWith('## ')) {
             return <h2 key={index} className="text-xl font-bold text-gray-900 mt-6 mb-3">{line.substring(3)}</h2>
           }
+          
+          // Handle subheadings (### Section)
+          if (line.startsWith('### ')) {
+            return <h3 key={index} className="text-lg font-semibold text-gray-900 mt-4 mb-2">{line.substring(4)}</h3>
+          }
+          
+          // Handle horizontal separator (---)
+          if (line.trim() === '---') {
+            return <hr key={index} className="my-6 border-gray-300" />
+          }
+          
+          // Handle bold text (**text**)
+          if (line.includes('**')) {
+            const parts = line.split('**')
+            return (
+              <p key={index} className="mb-3">
+                {parts.map((part, partIndex) => (
+                  partIndex % 2 === 1 ? (
+                    <strong key={partIndex}>{part}</strong>
+                  ) : (
+                    part
+                  )
+                ))}
+              </p>
+            )
+          }
+          
           return <p key={index} className="mb-3">{line}</p>
         })}
       </div>
     )
-  }
+  }, [content, handleTextSelection])
 
 
 
@@ -152,7 +234,7 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
       {/* Content */}
       <div className="bg-white rounded-xl shadow-lg p-8">
         <div className="prose prose-lg max-w-none formatted-content">
-          {renderContent()}
+          {renderContent}
         </div>
       </div>
 
@@ -170,14 +252,21 @@ const Reader: React.FC<ReaderProps> = ({ content, onBackToInput, geminiService }
       </div>
 
       {/* Tooltip */}
-      {tooltipPosition.visible && activeTerm && (
-        <TermTooltip
+      {(() => {
+        const shouldShow = tooltipPosition.visible && activeTerm && termExplanations[activeTerm]
+        console.log('Tooltip render check:', {
+          visible: tooltipPosition.visible,
+          activeTerm: activeTerm,
+          position: tooltipPosition,
+          hasExplanation: !!termExplanations[activeTerm || ''],
+          shouldShow: shouldShow
+        })
+        return null
+      })()}
+      {tooltipPosition.visible && activeTerm && termExplanations[activeTerm] && (
+        <StableTooltip
           term={activeTerm}
-          definition={termExplanations[activeTerm] || {
-            term: activeTerm,
-            definition: 'Loading...',
-            category: 'Other'
-          }}
+          definition={termExplanations[activeTerm]}
           position={tooltipPosition}
           onClose={handleCloseTooltip}
         />

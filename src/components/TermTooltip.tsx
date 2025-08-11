@@ -10,6 +10,8 @@ interface TermTooltipProps {
 }
 
 const TermTooltip: React.FC<TermTooltipProps> = ({ term, definition, position, onClose }) => {
+  console.log('TermTooltip rendering with:', { term, definition, position })
+  
   const getCategoryColor = (category: string) => {
     const colors = {
       'Finance': 'bg-green-100 text-green-800 border-green-200',

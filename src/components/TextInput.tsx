@@ -1,21 +1,24 @@
 import React, { useState } from 'react'
 import { Upload, FileText, ArrowRight, AlertCircle, Globe } from 'lucide-react'
 import { parsePDF } from '../utils/pdfParser'
-import { parseEPUB, isEPUBFile } from '../utils/epubParser'
+import { parseEPUB, parseEPUBToChapters, isEPUBFile, EbookChapter, EbookData } from '../utils/epubParser'
+import { generateEbookId, saveEbook } from '../utils/bookshelf'
 import { scrapeWebsite, isValidUrl } from '../utils/webScraper'
 
 interface TextInputProps {
   onStartReading: (text: string) => void
+  onStartEbookReading: (ebook: EbookData) => void
 }
 
-const TextInput: React.FC<TextInputProps> = ({ onStartReading }) => {
+const TextInput: React.FC<TextInputProps> = ({ onStartReading, onStartEbookReading }) => {
   const [text, setText] = useState<string>('')
   const [url, setUrl] = useState<string>('')
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [inputMode, setInputMode] = useState<'text' | 'file' | 'url'>('text')
 
-  const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+  const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+  const MAX_PDF_EPUB_FILE_SIZE = 15 * 1024 * 1024 // 15MB
 
   const sampleText = `## Understanding Business Metrics
 
@@ -33,9 +36,13 @@ Try selecting any technical term above to see instant AI explanations!`
     const file = event.target.files?.[0]
     if (!file) return
 
-    // Check file size
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`File too large. Please upload a file smaller than 5MB. Current size: ${(file.size / 1024 / 1024).toFixed(1)}MB`)
+    // Determine size limit by file type and validate
+    const isPdf = file.type === 'application/pdf'
+    const isEpub = isEPUBFile(file)
+    const maxAllowed = (isPdf || isEpub) ? MAX_PDF_EPUB_FILE_SIZE : MAX_TEXT_FILE_SIZE
+    if (file.size > maxAllowed) {
+      const limitMb = (maxAllowed / 1024 / 1024).toFixed(0)
+      setError(`File too large. Please upload a file smaller than ${limitMb}MB. Current size: ${(file.size / 1024 / 1024).toFixed(1)}MB`)
       return
     }
 
@@ -47,8 +54,19 @@ Try selecting any technical term above to see instant AI explanations!`
         const pdfText = await parsePDF(file)
         onStartReading(pdfText)
       } else if (isEPUBFile(file)) {
-        const epubText = await parseEPUB(file)
-        onStartReading(epubText)
+        console.log('📚 Processing EPUB as paginated ebook')
+        const ebookData = await parseEPUBToChapters(file)
+        const id = generateEbookId(ebookData.title)
+        const blob = new Blob([ebookData.arrayBuffer], { type: 'application/epub+zip' })
+        await saveEbook({
+          id,
+          title: ebookData.title,
+          author: ebookData.author,
+          addedAt: Date.now(),
+          sizeBytes: blob.size,
+          blob
+        })
+        onStartEbookReading({ ...ebookData, id })
       } else if (file.type === 'text/plain') {
         const text = await file.text()
         onStartReading(text)
@@ -187,7 +205,7 @@ Try selecting any technical term above to see instant AI explanations!`
           {inputMode === 'file' && (
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
               <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-2">Upload a PDF, EPUB, or text file (max 5MB)</p>
+              <p className="text-gray-600 mb-2">Upload a PDF or EPUB (max 15MB) or a text file (max 5MB)</p>
               <input
                 type="file"
                 accept=".txt,.pdf,.epub"

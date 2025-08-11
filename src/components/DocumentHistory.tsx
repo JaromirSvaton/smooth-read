@@ -1,6 +1,7 @@
 import React from 'react'
-import { History, FileText, Calendar, Tag } from 'lucide-react'
+import { History, FileText, Calendar, Tag, Book } from 'lucide-react'
 import { DocumentHistory } from '../types'
+import { StoredEbookMeta, listEbooks } from '../utils/bookshelf'
 
 interface DocumentHistoryProps {
   documents: DocumentHistory[]
@@ -13,6 +14,10 @@ const DocumentHistoryPanel: React.FC<DocumentHistoryProps> = ({
   onSelectDocument, 
   onClose 
 }) => {
+  const [ebooks, setEbooks] = React.useState<StoredEbookMeta[]>([])
+  React.useEffect(() => {
+    listEbooks().then(setEbooks).catch(() => setEbooks([]))
+  }, [])
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
@@ -40,6 +45,39 @@ const DocumentHistoryPanel: React.FC<DocumentHistoryProps> = ({
           >
             ✕
           </button>
+        </div>
+
+        {/* Bookshelf section */}
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <Book className="w-4 h-4" /> Bookshelf (EPUBs)
+          </h3>
+          {ebooks.length === 0 ? (
+            <p className="text-sm text-gray-500">No ebooks saved yet. Upload an EPUB to add it here.</p>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {ebooks.map(e => (
+                <li key={e.id} className="py-2 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900">{e.title}</p>
+                    <p className="text-xs text-gray-500">{e.author || 'Unknown Author'} • {(e.sizeBytes/1024/1024).toFixed(2)} MB</p>
+                  </div>
+                  <a
+                    href={`#open-ebook-${e.id}`}
+                    className="px-3 py-1 text-sm bg-primary-500 text-white rounded-md hover:bg-primary-600"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      const custom = new CustomEvent('open-bookshelf-ebook', { detail: { id: e.id } })
+                      window.dispatchEvent(custom)
+                      onClose()
+                    }}
+                  >
+                    Open
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {documents.length === 0 ? (

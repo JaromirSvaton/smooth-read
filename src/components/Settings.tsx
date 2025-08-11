@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Settings as SettingsIcon, Key, Eye, EyeOff, Bug } from 'lucide-react'
+import { getCurrentUsername, getUserRecord, saveUserSettings } from '../utils/auth'
 
 interface SettingsProps {
   apiKey: string
@@ -14,6 +15,10 @@ const Settings: React.FC<SettingsProps> = ({ apiKey, onApiKeyChange, onClose, on
 
   const handleSave = () => {
     onApiKeyChange(tempApiKey)
+    const user = getCurrentUsername()
+    if (user) {
+      saveUserSettings(user, { apiKey: tempApiKey })
+    }
     onClose()
   }
 
