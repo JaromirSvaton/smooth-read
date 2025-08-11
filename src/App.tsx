@@ -173,6 +173,7 @@ function App() {
             ebook={ebookData}
             onBackToInput={handleBackToInput}
             geminiService={geminiService}
+            theme={theme}
           />
         ) : (
           <Reader 
@@ -186,7 +187,17 @@ function App() {
       {showSettings && (
         <Settings
           apiKey={apiKey}
+          theme={theme}
           onApiKeyChange={handleApiKeyChange}
+          onThemeChange={(t) => {
+            setTheme(t)
+            // Persist per user if logged in
+            try {
+              const { getCurrentUsername, saveUserSettings } = require('./utils/auth')
+              const u = getCurrentUsername?.()
+              if (u) saveUserSettings?.(u, { theme: t })
+            } catch {}
+          }}
           onClose={() => setShowSettings(false)}
           onOpenDebug={() => {
             setShowSettings(false)

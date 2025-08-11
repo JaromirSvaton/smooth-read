@@ -1,23 +1,27 @@
 import React, { useState } from 'react'
-import { Settings as SettingsIcon, Key, Eye, EyeOff, Bug } from 'lucide-react'
-import { getCurrentUsername, getUserRecord, saveUserSettings } from '../utils/auth'
+import { Settings as SettingsIcon, Key, Eye, EyeOff, Bug, Palette } from 'lucide-react'
+import { getCurrentUsername, saveUserSettings } from '../utils/auth'
 
 interface SettingsProps {
   apiKey: string
+  theme: 'light' | 'dark' | 'sepia'
   onApiKeyChange: (apiKey: string) => void
+  onThemeChange: (theme: 'light' | 'dark' | 'sepia') => void
   onClose: () => void
   onOpenDebug: () => void
 }
 
-const Settings: React.FC<SettingsProps> = ({ apiKey, onApiKeyChange, onClose, onOpenDebug }) => {
+const Settings: React.FC<SettingsProps> = ({ apiKey, theme, onApiKeyChange, onThemeChange, onClose, onOpenDebug }) => {
   const [showApiKey, setShowApiKey] = useState(false)
   const [tempApiKey, setTempApiKey] = useState(apiKey)
+  const [tempTheme, setTempTheme] = useState<'light' | 'dark' | 'sepia'>(theme)
 
   const handleSave = () => {
     onApiKeyChange(tempApiKey)
+    onThemeChange(tempTheme)
     const user = getCurrentUsername()
     if (user) {
-      saveUserSettings(user, { apiKey: tempApiKey })
+      saveUserSettings(user, { apiKey: tempApiKey, theme: tempTheme })
     }
     onClose()
   }
@@ -71,6 +75,45 @@ const Settings: React.FC<SettingsProps> = ({ apiKey, onApiKeyChange, onClose, on
                 Google AI Studio
               </a>
             </p>
+          </div>
+
+          {/* Theme selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Theme
+            </label>
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${tempTheme==='light' ? 'border-primary-300 bg-primary-50' : 'border-gray-300'}`}>
+                <input
+                  id="theme-light"
+                  type="radio"
+                  name="theme"
+                  checked={tempTheme==='light'}
+                  onChange={() => setTempTheme('light')}
+                />
+                <label htmlFor="theme-light" className="text-sm">Light</label>
+              </div>
+              <div className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${tempTheme==='dark' ? 'border-primary-300 bg-primary-50' : 'border-gray-300'}`}>
+                <input
+                  id="theme-dark"
+                  type="radio"
+                  name="theme"
+                  checked={tempTheme==='dark'}
+                  onChange={() => setTempTheme('dark')}
+                />
+                <label htmlFor="theme-dark" className="text-sm">Dark</label>
+              </div>
+              <div className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${tempTheme==='sepia' ? 'border-primary-300 bg-primary-50' : 'border-gray-300'}`}>
+                <input
+                  id="theme-sepia"
+                  type="radio"
+                  name="theme"
+                  checked={tempTheme==='sepia'}
+                  onChange={() => setTempTheme('sepia')}
+                />
+                <label htmlFor="theme-sepia" className="text-sm">Sepia</label>
+              </div>
+            </div>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">

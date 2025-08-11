@@ -23,6 +23,7 @@ const EbookReader: React.FC<EbookReaderProps> = ({
   const viewerRef = useRef<HTMLDivElement | null>(null)
   const bookRef = useRef<any>(null)
   const renditionRef = useRef<any>(null)
+  const canResizeRef = useRef<boolean>(false)
 
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition>({ x: 0, y: 0, visible: false })
   const [activeTerm, setActiveTerm] = useState<string | null>(null)
@@ -87,6 +88,11 @@ const EbookReader: React.FC<EbookReaderProps> = ({
           await saveReadingPosition(ebook.id, location.start.cfi)
         }
       } catch {}
+    })
+
+    // Mark ready after first render
+    rendition.on('rendered', () => {
+      canResizeRef.current = true
     })
 
     // Selection handling inside iframe with proper coordinates
@@ -246,8 +252,15 @@ const EbookReader: React.FC<EbookReaderProps> = ({
   // Resize without reinitializing
   useEffect(() => {
     const rendition = renditionRef.current
-    if (!rendition) return
-    rendition.resize(containerWidth, '75vh')
+    if (!rendition || !canResizeRef.current) return
+    try {
+      // Some versions require manager to exist before resize
+      if (rendition.manager && typeof rendition.resize === 'function') {
+        rendition.resize(containerWidth, '75vh')
+      }
+    } catch (e) {
+      // Ignore resize errors if rendition is not fully ready yet
+    }
   }, [containerWidth])
 
   // inline explanation calls are performed inside selection handlers
